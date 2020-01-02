@@ -43,7 +43,7 @@ npix_window = 31
 
 
 # ellipse fitting code from: nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
-# fixed a number of typos from original source
+# moded a number of typos from original source
 def fitEllipse(x,y):
     x = x[:,np.newaxis]
     y = y[:,np.newaxis]
@@ -171,7 +171,7 @@ def ungrid_wgts(gwgts, uu, vv, du, dv, npix):
 
 
 
-def weight_multichan(base_ms, npix, cell_size, robust=np.array([0.]), chans=np.array([60]), method='briggs', perchanweight=False, fix_pcwd=False, npixels=0):
+def weight_multichan(base_ms, npix, cell_size, robust=np.array([0.]), chans=np.array([2]), method='briggs', perchanweight=False, mod_pcwd=False, npixels=0):
     tb = casatools.table()
     ms = casatools.ms()
 
@@ -221,7 +221,7 @@ def weight_multichan(base_ms, npix, cell_size, robust=np.array([0.]), chans=np.a
         gwgts_init = np.zeros((npix, npix))
         gwgts_init = grid_wgts(gwgts_init, np.ravel(uu_xc), np.ravel(vv_xc), du, dv, npix, np.ravel(np.broadcast_to(wgts_xc, (uu_xc.shape[1], uu_xc.shape[0])).T))
 
-    if fix_pcwd == True:
+    if mod_pcwd == True:
         # TODO CHECK THIS FOR HALF PIXEL OFFSET
         uvdist_grid = np.sqrt(np.add.outer(np.arange(-(npix/2.)*du, (npix/2.)*du, du)**2, np.arange(-(npix/2.)*dv, (npix/2.)*dv, dv)**2))
         frac_bw = (np.max(chan_freqs) - np.min(chan_freqs)) / rfreq
@@ -243,14 +243,14 @@ def weight_multichan(base_ms, npix, cell_size, robust=np.array([0.]), chans=np.a
                 # calculate robust parameters
                 # normalize differently if only using single channel; note that we assume the weights are not channelized and are uniform across channel
                 if perchanweight == True:
-                    if fix_pcwd == True:
+                    if mod_pcwd == True:
                         f_sq = ((5*10**(-r))**2)/(np.sum(gwgts_init_sq)/(np.sum(wgts_xc)*2))
                     else:
                         f_sq = ((5*10**(-r))**2)/(np.sum(gwgts_init_sq)/(np.sum(wgts_xc)))
                 else:
                     f_sq = ((5*10**(-r))**2)/(np.sum(gwgts_init_sq)/(np.sum(wgts_xc*uu_xc.shape[1])*2))
 
-                if fix_pcwd==True:
+                if mod_pcwd==True:
                     gr_wgts = 1/(1+gwgts_init/corr_fac*f_sq)
                 else:
                     gr_wgts = 1/(1+gwgts_init*f_sq)
@@ -296,25 +296,19 @@ def weight_multichan(base_ms, npix, cell_size, robust=np.array([0.]), chans=np.a
 npix = 1024
 cell_size = 0.02
 
-rms1, beam_params1 = weight_multichan("/lustre/cv/users/rloomis/research_tickets/fix_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.linspace(-2,2,81), method='briggs', perchanweight=True, npixels=0)
+#rms1, beam_params1 = weight_multichan("/lustre/cv/users/rloomis/research_tickets/mod_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.linspace(-2,2,81), method='briggs', perchanweight=True, npixels=0)
+#rms1f, beam_params1f = weight_multichan("/lustre/cv/users/rloomis/research_tickets/mod_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.linspace(-2,2,81), method='briggs', perchanweight=True, npixels=0, mod_pcwd=True)
+#rms2, beam_params2 = weight_multichan("/lustre/cv/users/rloomis/research_tickets/mod_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.linspace(-2,2,81), method='briggs', perchanweight=False, npixels=0, mod_pcwd=False)
 
-rms1f, beam_params1f = weight_multichan("/lustre/cv/users/rloomis/research_tickets/fix_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.linspace(-2,2,81), method='briggs', perchanweight=True, npixels=0, fix_pcwd=True)
-
-rms2, beam_params2 = weight_multichan("/lustre/cv/users/rloomis/research_tickets/fix_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.linspace(-2,2,81), method='briggs', perchanweight=False, npixels=0, fix_pcwd=False)
-
-
-#pl.plot(beam_params1f[:,1,:])
-#pl.plot(beam_params2[:,1,:])
-#pl.show()
+rms1, beam_params1 = weight_multichan("/lustre/cv/users/rloomis/research_tickets/mod_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.array([-2., 0., 0.5, 1., 2.]), method='briggs', perchanweight=True, npixels=0, chans=np.arange(118))
+rms1f, beam_params1f = weight_multichan("/lustre/cv/users/rloomis/research_tickets/mod_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.array([-2., 0., 0.5, 1., 2.]), method='briggs', perchanweight=True, npixels=0, mod_pcwd=True, chans=np.arange(118))
+rms2, beam_params2 = weight_multichan("/lustre/cv/users/rloomis/research_tickets/mod_pcwd/J1610_spw21.ms", npix, cell_size=cell_size, robust=np.array([-2., 0., 0.5, 1., 2.]), method='briggs', perchanweight=False, npixels=0, mod_pcwd=False, chans=np.arange(118))
 
 
-
+'''
 rms1 = rms1[0]
 rms1f = rms1f[0]
 rms2 = rms2[0]
-
-#beam_params1 = beam_params1[0]
-#beam_params2 = beam_params2[0]
 
 robust1=np.linspace(-2.,2.,81)
 robust1f=np.linspace(-2.,2.,81)
@@ -339,7 +333,7 @@ rms1 *= 1000.
 rms1f *= 1000.
 rms2 *= 1000.
 
-
+'''
 
 
 
@@ -361,7 +355,7 @@ rms1 /= np.min(rms1)
 
 
 
-
+'''
 
 fig = pl.figure(figsize=(4,2.7), dpi=300)
 ax = pl.axes([0.12,0.13,0.83,0.84])
@@ -409,25 +403,22 @@ ax.yaxis.set_label_coords(-0.09, 0.5)
 pl.xlabel(r'RMS [mJy/bm]', size=9)
 ax.xaxis.set_label_coords(0.5, -0.09)
 
-ax.text(0.5, 0.92, "Center Channel", size='9', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+ax.text(0.5, 0.92, "Edge Channel", size='9', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
 
 prop=FontProperties(size=8)
-legend = pl.legend([img1, img1f, img2], ["PCWD=True", "PCWD=True w/ fix", "PCWD=False"], prop=prop, loc=1, borderaxespad=2.)
+legend = pl.legend([img1, img1f, img2], ["PCWD=True", "PCWD=True w/ mod", "PCWD=False"], prop=prop, loc=1, borderaxespad=2.)
 legend.draw_frame(False)
 
 
 #pl.show()
-pl.savefig("tradeoff_curve_center_channel.pdf")
-
-
-
-
-
-
-
+pl.savefig("tradeoff_curve_edge_channel.pdf")
 
 
 '''
+
+
+
+
 
 fig = pl.figure(figsize=(4,2.7), dpi=300)
 ax = pl.axes([0.12,0.13,0.83,0.84])
@@ -461,7 +452,7 @@ ax.xaxis.set_label_coords(0.5, -0.09)
 
 
 pl.xlim(-20,170)
-pl.ylim(0.1,0.18)
+pl.ylim(0.1,0.185)
 
 ax.yaxis.set_major_locator(MultipleLocator(0.02))
 ax.yaxis.set_minor_locator(MultipleLocator(0.005))
@@ -471,17 +462,21 @@ ax.xaxis.set_minor_locator(MultipleLocator(10))
 pl.setp(ax.get_xticklabels(), size='9')
 pl.setp(ax.get_yticklabels(), size='9')
 
+ax.text(0.37, 0.94, "Predicted PSF", size='9', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
 prop=FontProperties(size=6)
-legend = pl.legend([img2, img1, img3], ["PCWD=T", "PCWD=T+fix", "PCWD=F"], prop=prop, loc=1, borderaxespad=0.35)
+legend = pl.legend([img2, img1, img3], ["PCWD=T", "PCWD=T+mod", "PCWD=F"], prop=prop, loc=1, borderaxespad=0.35)
 legend.draw_frame(False)
 
 pl.savefig("spectral_curvature_predicted.pdf")
 
 
 
-'''
 
 
+
+# Everything below this point is what you would need if you wanted to use a GCF like CASA actually does
+# it doesn't seem to make a huge difference here, so avoiding for speed reasons
 
 '''            
 

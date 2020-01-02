@@ -32,16 +32,17 @@ pl.rcParams['xtick.major.pad']='2'
 pl.rcParams['ytick.major.pad']='2'
 
 
+prefix = '/lustre/cv/users/rloomis/research_tickets/mod_pcwd/'
 
 
-filenames=['r-2_c0.02_pcwdT.psf', 'r0_c0.02_pcwdT.psf', 'r0.5_c0.02_pcwdT.psf', 'r1_c0.02_pcwdT.psf', 'r2_c0.02_pcwdT.psf', 'r-2_c0.02_pcwdFIX.psf', 'r0_c0.02_pcwdFIX.psf', 'r0.5_c0.02_pcwdFIX.psf', 'r1_c0.02_pcwdFIX.psf', 'r2_c0.02_pcwdFIX.psf', 'r-2_c0.02_pcwdF.psf', 'r0_c0.02_pcwdF.psf', 'r0.5_c0.02_pcwdF.psf', 'r1_c0.02_pcwdF.psf', 'r2_c0.02_pcwdF.psf']
+filenames=[prefix + 'r-2_c0.02_pcwdT.psf', prefix + 'r0_c0.02_pcwdT.psf', prefix + 'r0.5_c0.02_pcwdT.psf', prefix + 'r1_c0.02_pcwdT.psf', prefix + 'r2_c0.02_pcwdT.psf', prefix + 'r-2_c0.02_pcwdMOD.psf', prefix + 'r0_c0.02_pcwdMOD.psf', prefix + 'r0.5_c0.02_pcwdMOD.psf', prefix + 'r1_c0.02_pcwdMOD.psf', prefix + 'r2_c0.02_pcwdMOD.psf', prefix + 'r-2_c0.02_pcwdF.psf', prefix + 'r0_c0.02_pcwdF.psf', prefix + 'r0.5_c0.02_pcwdF.psf', prefix + 'r1_c0.02_pcwdF.psf', prefix + 'r2_c0.02_pcwdF.psf']
 
 ia = casatools.image()
 npix_window = 31
 
 
 # ellipse fitting code from: nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
-# fixed a number of typos from original source
+# moded a number of typos from original source
 def fitEllipse(x,y):
     x = x[:,np.newaxis]
     y = y[:,np.newaxis]
@@ -205,7 +206,7 @@ ax.xaxis.set_label_coords(0.5, -0.09)
 
 
 pl.xlim(-20,170)
-pl.ylim(0.1,0.18)
+pl.ylim(0.1,0.185)
 
 ax.yaxis.set_major_locator(MultipleLocator(0.02))
 ax.yaxis.set_minor_locator(MultipleLocator(0.005))
@@ -215,8 +216,10 @@ ax.xaxis.set_minor_locator(MultipleLocator(10))
 pl.setp(ax.get_xticklabels(), size='9')
 pl.setp(ax.get_yticklabels(), size='9')
 
+ax.text(0.37, 0.94, "PSF from CASA imaging", size='9', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
 prop=FontProperties(size=6)
-legend = pl.legend([img1, img2, img3], ["PCWD=T", "PCWD=T+fix", "PCWD=F"], prop=prop, loc=1, borderaxespad=0.35)
+legend = pl.legend([img1, img2, img3], ["PCWD=T", "PCWD=T+mod", "PCWD=F"], prop=prop, loc=1, borderaxespad=0.35)
 legend.draw_frame(False)
 
 pl.savefig("spectral_curvature.pdf")

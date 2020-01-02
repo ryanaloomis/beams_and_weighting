@@ -158,8 +158,8 @@ tclean(vis = ['J1610_spw21.ms'],
 
 
 
-tclean(vis = ['test_r0_c0.02_fix.ms'],
-  imagename = 'r0_c0.02_pcwdFIX',
+tclean(vis = ['test_r0_c0.02_mod.ms'],
+  imagename = 'r0_c0.02_pcwdMOD',
   specmode = 'cube',
   interactive = False,
   niter=20000,
@@ -172,8 +172,8 @@ tclean(vis = ['test_r0_c0.02_fix.ms'],
 
 
 
-tclean(vis = ['test_r-2_c0.02_fix.ms'],
-  imagename = 'r-2_c0.02_pcwdFIX',
+tclean(vis = ['test_r-2_c0.02_mod.ms'],
+  imagename = 'r-2_c0.02_pcwdMOD',
   specmode = 'cube',
   interactive = False,
   niter=20000,
@@ -185,8 +185,8 @@ tclean(vis = ['test_r-2_c0.02_fix.ms'],
   threshold='0.0003Jy')
 
 
-tclean(vis = ['test_r0.5_c0.02_fix.ms'],
-  imagename = 'r0.5_c0.02_pcwdFIX',
+tclean(vis = ['test_r0.5_c0.02_mod.ms'],
+  imagename = 'r0.5_c0.02_pcwdMOD',
   specmode = 'cube',
   interactive = False,
   niter=20000,
@@ -198,8 +198,8 @@ tclean(vis = ['test_r0.5_c0.02_fix.ms'],
   threshold='0.0003Jy')
 
 
-tclean(vis = ['test_r1_c0.02_fix.ms'],
-  imagename = 'r1_c0.02_pcwdFIX',
+tclean(vis = ['test_r1_c0.02_mod.ms'],
+  imagename = 'r1_c0.02_pcwdMOD',
   specmode = 'cube',
   interactive = False,
   niter=20000,
@@ -211,8 +211,8 @@ tclean(vis = ['test_r1_c0.02_fix.ms'],
   threshold='0.0003Jy')
 
 
-tclean(vis = ['test_r2_c0.02_fix.ms'],
-  imagename = 'r2_c0.02_pcwdFIX',
+tclean(vis = ['test_r2_c0.02_mod.ms'],
+  imagename = 'r2_c0.02_pcwdMOD',
   specmode = 'cube',
   interactive = False,
   niter=20000,
