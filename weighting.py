@@ -58,12 +58,14 @@ def fitEllipse(x,y):
         a = -a
     return a
 
+
 def ellipse_center(a):
     b,c,d,f,g,a = a[1]/2, a[2], a[3]/2, a[4]/2, a[5], a[0]
     num = b*b-a*c
     x0=(c*d-b*f)/num
     y0=(a*f-b*d)/num
     return np.array([x0,y0])
+
 
 def ellipse_angle_of_rotation(a):
     b,c,d,f,g,a = a[1]/2, a[2], a[3]/2, a[4]/2, a[5], a[0]
@@ -78,6 +80,7 @@ def ellipse_angle_of_rotation(a):
         else:
             return np.pi/2 + np.arctan(2*b/(a-c))/2
 
+
 def ellipse_axis_length(a):
     b,c,d,f,g,a = a[1]/2, a[2], a[3]/2, a[4]/2, a[5], a[0]
     up = 2*(a*f*f+c*d*d+g*b*b-2*b*d*f-a*c*g)
@@ -86,6 +89,7 @@ def ellipse_axis_length(a):
     res1=np.sqrt(up/down1)
     res2=np.sqrt(up/down2)
     return np.array([res1, res2])
+
 
 def find_ellipse(x, y):
     xmean = x.mean()
@@ -101,6 +105,27 @@ def find_ellipse(x, y):
     x += xmean
     y += ymean
     return center, phi, axes
+
+
+def gaussian2D(params, nrow):
+    width_x, width_y, rotation = params
+    rotation = 90-rotation
+
+    rotation = np.deg2rad(rotation)
+    x, y = np.indices((nrow*2+1,nrow*2+1)) - nrow
+
+    xp = x * np.cos(rotation) - y * np.sin(rotation)
+    yp = x * np.sin(rotation) + y * np.cos(rotation)
+    g = 1.*np.exp(-(((xp)/width_x)**2+((yp)/width_y)**2)/2.)
+    return g
+
+
+def beam_chi2(params, psf, nrow):
+    psf_ravel = psf[~np.isnan(psf)]
+    gaussian = gaussian2D(params, nrow)[~np.isnan(psf)]
+    chi2 = np.sum((gaussian-psf_ravel)**2)
+    return chi2
+
 
 
 def fit_beam(psf_data_raw, cell_size):
@@ -120,7 +145,7 @@ def fit_beam(psf_data_raw, cell_size):
     for chan in np.arange(psf_rolled.shape[0]):
         psf_currchan = psf_rolled[chan]
 
-        # Window out the central 21 pixels - this seems to be wide enough in general, but could be modified
+        # Window out the central npix_window pixels
         psf_windowed = psf_currchan[int(npix/2-(npix_window-1)/2):int(npix/2+(npix_window-1)/2 + 1), int(npix/2-(npix_window-1)/2):int(npix/2+(npix_window-1)/2 + 1)]
 
         # make pixel coordinates for the interpolation - x, y are the native grid
@@ -149,6 +174,55 @@ def fit_beam(psf_data_raw, cell_size):
             phi += 180.
         major = axes[0]/400.*(npix_window-1)*delta*2
         minor = axes[1]/400.*(npix_window-1)*delta*2
+
+        return phi, major, minor
+
+
+
+
+def fit_beam_CASA(psf_data_raw, cell_size):
+    delta = cell_size
+    npix = psf_data_raw.shape[0]         # Assume image is square
+
+    # Check if image cube, or just single psf; this example doesn't handle the full polarization case - implicitly assumes we can drop Stokes
+    # If single psf, add an axis so we can use a single loop
+    psf_data = np.squeeze(psf_data_raw)
+    if len(psf_data.shape) == 2:
+        psf_data = np.expand_dims(psf_data, axis=2)
+
+    # Roll the axes to make looping more straightforward
+    psf_rolled = np.rollaxis(psf_data,2)
+
+    nrow = 4
+
+    # Loop through the channels and fit a psf to each one
+    for chan in np.arange(psf_rolled.shape[0]):
+        psf_currchan = psf_rolled[chan]
+
+        # Window out the central 11 pixels - hardcoded for CASA
+        psf_windowed = psf_currchan[int(npix/2-(nrow*2)/2):int(npix/2+(nrow*2)/2 + 1), int(npix/2-(nrow*2)/2):int(npix/2+(nrow*2)/2 + 1)]
+
+        # Set threshold (a=0.35 by default for CASA)
+        threshold = 0.35
+
+        # Only consider pixels over the threshold
+        psf_thresh = np.copy(psf_windowed)
+        psf_thresh[psf_thresh<threshold] = np.nan
+
+        #pl.imshow(psf_thresh)
+        #pl.show()
+        
+        # Fit a gaussian to the thresholded points
+        p0 = [2.5, 2.5, 0.]
+        res = optimize.minimize(beam_chi2, p0, args=(psf_thresh, nrow))
+
+        # convert to useful units
+        phi = res.x[2] - 90.
+        if phi < -90.:
+            phi += 180.
+
+        major = np.max(np.abs(res.x[0:2]))*delta*2.355
+        minor = np.min(np.abs(res.x[0:2]))*delta*2.355
 
         return phi, major, minor
 
@@ -275,7 +349,8 @@ def weight_multichan(base_ms, npix, cell_size, robust=np.array([0.]), chans=np.a
             # create the dirty beam and calculate the beam parameters
             robust_beam = np.real(fftshift(fft2(fftshift(gwgts_final))))
             robust_beam /= np.max(robust_beam)
-            beam_params[i,:,j] = fit_beam(robust_beam, cell_size)
+            #beam_params[i,:,j] = fit_beam(robust_beam, cell_size)
+            beam_params[i,:,j] = fit_beam_CASA(robust_beam, cell_size)
 
             # calculate rms (formula from Briggs et al. 1995)
             C = 1/(2*np.sum(wgts_robust))
@@ -468,7 +543,7 @@ prop=FontProperties(size=6)
 legend = pl.legend([img2, img1, img3], ["PCWD=T", "PCWD=T+mod", "PCWD=F"], prop=prop, loc=1, borderaxespad=0.35)
 legend.draw_frame(False)
 
-pl.savefig("spectral_curvature_predicted.pdf")
+pl.savefig("spectral_curvature_predicted_CASA.pdf")
 
 
 

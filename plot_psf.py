@@ -37,6 +37,8 @@ prefix = '/lustre/cv/users/rloomis/research_tickets/mod_pcwd/'
 
 filenames=[prefix + 'r-2_c0.02_pcwdT.psf', prefix + 'r0_c0.02_pcwdT.psf', prefix + 'r0.5_c0.02_pcwdT.psf', prefix + 'r1_c0.02_pcwdT.psf', prefix + 'r2_c0.02_pcwdT.psf', prefix + 'r-2_c0.02_pcwdMOD.psf', prefix + 'r0_c0.02_pcwdMOD.psf', prefix + 'r0.5_c0.02_pcwdMOD.psf', prefix + 'r1_c0.02_pcwdMOD.psf', prefix + 'r2_c0.02_pcwdMOD.psf', prefix + 'r-2_c0.02_pcwdF.psf', prefix + 'r0_c0.02_pcwdF.psf', prefix + 'r0.5_c0.02_pcwdF.psf', prefix + 'r1_c0.02_pcwdF.psf', prefix + 'r2_c0.02_pcwdF.psf']
 
+#filenames=[prefix + 'r2_c0.02_pcwdF.psf']
+
 ia = casatools.image()
 npix_window = 31
 
@@ -102,6 +104,27 @@ def find_ellipse(x, y):
     return center, phi, axes
 
 
+def gaussian2D(params, nrow):
+    width_x, width_y, rotation = params
+    rotation = 90-rotation
+
+    rotation = np.deg2rad(rotation)
+    x, y = np.indices((nrow*2+1,nrow*2+1)) - nrow
+
+    xp = x * np.cos(rotation) - y * np.sin(rotation)
+    yp = x * np.sin(rotation) + y * np.cos(rotation)
+    g = 1.*np.exp(-(((xp)/width_x)**2+((yp)/width_y)**2)/2.)
+    return g
+
+
+def beam_chi2(params, psf, nrow):
+    psf_ravel = psf[~np.isnan(psf)]
+    gaussian = gaussian2D(params, nrow)[~np.isnan(psf)]
+    chi2 = np.sum((gaussian-psf_ravel)**2)
+    return chi2
+
+
+
 def fit_beam(psf_data_raw, cell_size):
     delta = cell_size
     npix = psf_data_raw.shape[0]         # Assume image is square
@@ -114,8 +137,6 @@ def fit_beam(psf_data_raw, cell_size):
 
     # Roll the axes to make looping more straightforward
     psf_rolled = np.rollaxis(psf_data,2)
-
-    print(psf_rolled.shape)
 
     major = np.zeros(psf_rolled.shape[0])
     minor = np.zeros(psf_rolled.shape[0])
@@ -156,7 +177,61 @@ def fit_beam(psf_data_raw, cell_size):
         major[chan] = axes[0]/400.*(npix_window-1)*delta*2
         minor[chan] = axes[1]/400.*(npix_window-1)*delta*2
 
-    return phi, major, minor
+    return phi_grid, major, minor
+
+
+
+
+def fit_beam_CASA(psf_data_raw, cell_size):
+    delta = cell_size
+    npix = psf_data_raw.shape[0]         # Assume image is square
+
+    # Check if image cube, or just single psf; this example doesn't handle the full polarization case - implicitly assumes we can drop Stokes
+    # If single psf, add an axis so we can use a single loop
+    psf_data = np.squeeze(psf_data_raw)
+    if len(psf_data.shape) == 2:
+        psf_data = np.expand_dims(psf_data, axis=2)
+
+    # Roll the axes to make looping more straightforward
+    psf_rolled = np.rollaxis(psf_data,2)
+
+    major = np.zeros(psf_rolled.shape[0])
+    minor = np.zeros(psf_rolled.shape[0])
+    phi_grid = np.zeros(psf_rolled.shape[0])
+
+    nrow = 4
+
+    # Loop through the channels and fit a psf to each one
+    for chan in np.arange(psf_rolled.shape[0]):
+        psf_currchan = psf_rolled[chan]
+
+        # Window out the central 11 pixels - hardcoded for CASA
+        psf_windowed = psf_currchan[int(npix/2-(nrow*2)/2):int(npix/2+(nrow*2)/2 + 1), int(npix/2-(nrow*2)/2):int(npix/2+(nrow*2)/2 + 1)]
+
+        # Set threshold (a=0.35 by default for CASA)
+        threshold = 0.35
+
+        # Only consider pixels over the threshold
+        psf_thresh = np.copy(psf_windowed)
+        psf_thresh[psf_thresh<threshold] = np.nan
+
+        #pl.imshow(psf_thresh)
+        #pl.show()
+        
+        # Fit a gaussian to the thresholded points
+        p0 = [2.5, 2.5, 0.]
+        res = optimize.minimize(beam_chi2, p0, args=(psf_thresh, nrow))
+
+        # convert to useful units
+        phi = res.x[2] - 90.
+        if phi < -90.:
+            phi += 180.
+
+        phi_grid[chan] = phi
+        major[chan] = np.max(np.abs(res.x[0:2]))*delta*2.355
+        minor[chan] = np.min(np.abs(res.x[0:2]))*delta*2.355
+
+    return phi_grid, major, minor
 
 
 fig = pl.figure(figsize=(4,2.7), dpi=300)
@@ -175,25 +250,36 @@ for i, filename in enumerate(filenames):
 
     delta = np.abs(hdr['incr'][0]*206265)
 
+    major_CASA = np.zeros(118)
+    minor_CASA = np.zeros(118)
+    phi_CASA = np.zeros(118)
+
+    for j in range(118):
+        chan = j+5
+        major_CASA[j] = hdr['perplanebeams']['beams']['*'+str(chan)]['*0']['major']['value']
+        minor_CASA[j] = hdr['perplanebeams']['beams']['*'+str(chan)]['*0']['minor']['value']
+        phi_CASA[j] = hdr['perplanebeams']['beams']['*'+str(chan)]['*0']['positionangle']['value']
+
     psf_data_raw = psf_data_raw[:,:,:,5:123]
 
-    phi, major, minor = fit_beam(psf_data_raw, 0.02)
+    phi, major, minor = fit_beam_CASA(psf_data_raw, 0.02)
 
-    print(major)
-    
     if i < 5:
         color = 'darkslateblue'
         img1, = pl.plot(major, linewidth=1.5, color=color, alpha=0.4+0.15*i)
+        img1_C, = pl.plot(major_CASA, linewidth=1.5, color=color, alpha=0.4+0.15*i, linestyle='dashed')
         ax.annotate('{:.2f}'.format(r[i]), (0., major[0]), horizontalalignment='right', verticalalignment='center', size=7, color=color, xytext=(-2,0), textcoords='offset points')
     
     elif i < 10:
         color = 'darkorange'
         img2, = pl.plot(major, linewidth=1.5, color=color, alpha=0.4+0.15*(i-5))
+        img2_C, = pl.plot(major_CASA, linewidth=1.5, color=color, alpha=0.4+0.15*(i-5), linestyle='dashed')
         if i < 9:
             ax.annotate('{:.2f}'.format(r[i]), (118., major[117]), horizontalalignment='left', verticalalignment='center', size=7, color=color, xytext=(2,0), textcoords='offset points')
     else:
         color = 'firebrick'
         img3, = pl.plot(major, linewidth=1.5, color=color, alpha=0.4+0.15*(i-10))
+        img3_C, = pl.plot(major_CASA, linewidth=1.5, color=color, alpha=0.4+0.15*(i-10), linestyle='dashed')
         ax.annotate('{:.2f}'.format(r[i]), (0., major[0]), horizontalalignment='right', verticalalignment='center', size=7, color=color, xytext=(-2,0), textcoords='offset points')
     
     print("plotted")
@@ -222,4 +308,4 @@ prop=FontProperties(size=6)
 legend = pl.legend([img1, img2, img3], ["PCWD=T", "PCWD=T+mod", "PCWD=F"], prop=prop, loc=1, borderaxespad=0.35)
 legend.draw_frame(False)
 
-pl.savefig("spectral_curvature.pdf")
+pl.savefig("spectral_curvature_CASA.pdf")
